@@ -4,7 +4,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -30,29 +29,23 @@ func (e *Encryptor) Encrypt(data []byte, passphrase string) (map[string]interfac
 		return nil, err
 	}
 
-	block, err := aes.NewCipher(decryptionKey[:16])
+	block, err := aes.NewCipher(decryptionKey)
 	if err != nil {
 		return nil, err
 	}
 
 	//cipherMsg := make([]byte, len(seed))
-	aesIV := make([]byte, 16)
+	aesIV := make([]byte, 12)
 	if _, err := rand.Read(aesIV); err != nil {
 		return nil, err
 	}
 
 	cipherText := make([]byte, len(data))
-	stream := cipher.NewCTR(block, aesIV)
-	stream.XORKeyStream(cipherText, data)
-
-	h := sha256.New()
-	if _, err := h.Write(decryptionKey[16:32]); err != nil {
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
 		return nil, err
 	}
-	if _, err := h.Write(cipherText); err != nil {
-		return nil, err
-	}
-	checksumMsg := h.Sum(nil)
+	aesgcm.Seal(cipherText, aesIV, data, nil)
 
 	var kdf *_kdf
 	switch e.cipher {
@@ -66,15 +59,10 @@ func (e *Encryptor) Encrypt(data []byte, passphrase string) (map[string]interfac
 		}
 	}
 
-	output := &keystoreV4{
+	output := &keystoreV1{
 		KDF: kdf,
-		Checksum: &_checksum{
-			Function: "sha256",
-			Params:   make(map[string]interface{}),
-			Message:  hex.EncodeToString(checksumMsg),
-		},
 		Cipher: &_cipher{
-			Function: "aes-128-ctr",
+			Function: "aes-256-gcm",
 			Params: &paramsCipher{
 				IV: hex.EncodeToString(aesIV),
 			},

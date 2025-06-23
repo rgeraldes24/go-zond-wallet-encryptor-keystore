@@ -14,12 +14,6 @@ type _kdf struct {
 	Message  string     `json:"message"`
 }
 
-type _checksum struct {
-	Function string                 `json:"function"`
-	Params   map[string]interface{} `json:"params"`
-	Message  string                 `json:"message"`
-}
-
 type paramsCipher struct {
 	IV string `json:"iv,omitempty"`
 }
@@ -30,10 +24,9 @@ type _cipher struct {
 	Message  string        `json:"message"`
 }
 
-type keystoreV4 struct {
-	KDF      *_kdf      `json:"kdf"`
-	Checksum *_checksum `json:"checksum"`
-	Cipher   *_cipher   `json:"cipher"`
+type keystoreV1 struct {
+	KDF    *_kdf    `json:"kdf"`
+	Cipher *_cipher `json:"cipher"`
 }
 
 const (

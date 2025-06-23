@@ -1,11 +1,8 @@
 package keystorev1
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,15 +35,12 @@ func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("keystore cannot be parsed | reason %v", err)
 	}
-	ks := &keystoreV4{}
+	ks := &keystoreV1{}
 	err = json.Unmarshal(b, &ks)
 	if err != nil {
 		return nil, fmt.Errorf("keystore cannot be parsed | reason %v", err)
 	}
 
-	if ks.Checksum == nil {
-		return nil, errors.New("checksum cannot be nil")
-	}
 	if ks.Cipher == nil {
 		return nil, errors.New("cipher cannot be nil")
 	}
@@ -74,27 +68,11 @@ func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]b
 	if err != nil {
 		return nil, errors.New("invalid cipher message")
 	}
-	h := sha256.New()
-	if _, err := h.Write(decryptionKey[16:32]); err != nil {
-		return nil, err
-	}
-	if _, err := h.Write(cipherMsg); err != nil {
-		return nil, err
-	}
-	expectedChecksum := h.Sum(nil)
-	foundChecksum, err := misc.DecodeHex(ks.Checksum.Message)
-	if err != nil {
-		return nil, fmt.Errorf("invalid checksum message | reason %v", err.Error())
-	}
-	if !bytes.Equal(expectedChecksum, foundChecksum) {
-		return nil, fmt.Errorf("checksum mismatch | expected %s | found %s",
-			hex.EncodeToString(expectedChecksum), hex.EncodeToString(foundChecksum))
-	}
 
 	decipheredMessage := make([]byte, len(cipherMsg))
 	switch ks.Cipher.Function {
-	case "aes-128-ctr":
-		aesCipher, err := aes.NewCipher(decryptionKey[:16])
+	case "aes-256-gcm":
+		aesCipher, err := aes.NewCipher(decryptionKey)
 		if err != nil {
 			return nil, err
 		}
@@ -102,8 +80,13 @@ func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]b
 		if err != nil {
 			return nil, fmt.Errorf("invalid aes IV | reason %v", err.Error())
 		}
-		stream := cipher.NewCTR(aesCipher, iv)
-		stream.XORKeyStream(decipheredMessage, cipherMsg)
+		aesgcm, err := cipher.NewGCM(aesCipher)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := aesgcm.Open(decipheredMessage, iv, cipherMsg, nil); err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unsupported cipher %s", ks.Cipher.Function)
 	}
