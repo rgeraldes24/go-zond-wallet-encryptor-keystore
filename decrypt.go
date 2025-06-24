@@ -69,7 +69,6 @@ func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]b
 		return nil, errors.New("invalid cipher message")
 	}
 
-	decipheredMessage := make([]byte, len(cipherMsg))
 	switch ks.Cipher.Function {
 	case "aes-256-gcm":
 		aesCipher, err := aes.NewCipher(decryptionKey)
@@ -84,12 +83,12 @@ func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]b
 		if err != nil {
 			return nil, err
 		}
-		if _, err := aesgcm.Open(decipheredMessage, iv, cipherMsg, nil); err != nil {
+		decipheredMessage, err := aesgcm.Open(nil, iv, cipherMsg, nil)
+		if err != nil {
 			return nil, err
 		}
+		return decipheredMessage, nil
 	default:
 		return nil, fmt.Errorf("unsupported cipher %s", ks.Cipher.Function)
 	}
-
-	return decipheredMessage, nil
 }

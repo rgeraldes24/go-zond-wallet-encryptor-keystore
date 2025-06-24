@@ -34,18 +34,16 @@ func (e *Encryptor) Encrypt(data []byte, passphrase string) (map[string]interfac
 		return nil, err
 	}
 
-	//cipherMsg := make([]byte, len(seed))
 	aesIV := make([]byte, 12)
 	if _, err := rand.Read(aesIV); err != nil {
 		return nil, err
 	}
 
-	cipherText := make([]byte, len(data))
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
-	aesgcm.Seal(cipherText, aesIV, data, nil)
+	cipherText := aesgcm.Seal(nil, aesIV, data, nil)
 
 	var kdf *_kdf
 	switch e.cipher {
