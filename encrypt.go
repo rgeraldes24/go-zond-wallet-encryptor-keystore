@@ -18,7 +18,7 @@ const (
 
 	// Argon2id parameters.
 	argon2idT      = 8
-	argon2idM      = 1 << 16
+	argon2idM      = 1 << 12
 	argon2idP      = 1
 	argon2idKeyLen = 32
 
@@ -26,9 +26,8 @@ const (
 	cipherAes256Gcm = "aes-256-gcm"
 
 	// Misc constants.
-	saltSize             = 32
-	ivSize               = 12
-	minDecryptionKeySize = 32
+	saltSize = 32
+	ivSize   = 12
 )
 
 // Encrypt encrypts data.

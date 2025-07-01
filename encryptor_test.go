@@ -1,6 +1,7 @@
 package keystorev1_test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 
@@ -16,6 +17,9 @@ func TestInterfaces(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
+	secret, err := hex.DecodeString("5dfdcad4f721fe41d1bdf632de24ba60ba7cfab9c9a79287fa007b6a0dec8200b1fa35d2575bb15bd44d59b8d878828b")
+	require.NoError(t, err)
+
 	tests := []struct {
 		name       string
 		input      string
@@ -26,15 +30,9 @@ func TestRoundTrip(t *testing.T) {
 	}{
 		{
 			name:       "Test1",
-			input:      `{"cipher":{"function":"aes-256-gcm","message":"c179fe7679a4756ac7ea044458c76e330d49bb85c6cc810ff60fcee8294a5886","params":{"iv":"179c9689b7252836c2a449e63544b222"}},"kdf":{"function":"argon2id","params":{"salt":"b518a4d4ff18959eaef9f93d247d707945829a81c2d10983b65af6beb43d09ce"}}}`,
-			passphrase: "1234password",
-			secret:     []byte{0x0, 0xfc, 0xd5, 0xa5, 0x80, 0x43, 0x39, 0xb6, 0xd8, 0xd4, 0x51, 0x7a, 0xd7, 0x3e, 0x4e, 0x86, 0x6f, 0xaf, 0xbe, 0x41, 0x98, 0xd0, 0xbc, 0xc7, 0x5, 0xef, 0x95, 0x33, 0x41, 0x7d, 0x72, 0x2c},
-		},
-		{
-			name:       "Test2",
-			input:      `{"kdf":{"function":"argon2id","params":{"salt":"b518a4d4ff18959eaef9f93d247d707945829a81c2d10983b65af6beb43d09ce"}},"cipher":{"function":"aes-256-gcm","params":{"iv":"f0f7891dcfb9a6b534cc36491038f7e4"},"message":"5b2349913e020266c82c93564ba32678999d6e22160530f8cc0f256a7e6ba0dd"}}`,
-			passphrase: "!!99338@@00",
-			secret:     []byte{0x94, 0x45, 0x6b, 0x3f, 0x20, 0xf6, 0x46, 0xac, 0x2d, 0x15, 0x14, 0xb2, 0x6a, 0x2a, 0x56, 0xb, 0xb0, 0xbc, 0xe9, 0xa1, 0x6b, 0x75, 0xd6, 0xd4, 0x98, 0xfd, 0x63, 0xb1, 0xb6, 0xb8, 0x37, 0x4a},
+			input:      `{"kdf":{"function":"argon2id","params":{"dklen":32,"m":262144,"p":1,"salt":"2c2f566f38f5b79634d17267d95a0914ed47a44fe91f9cbb0b8765ebaa0b7ddd","t":8}},"cipher":{"function":"aes-256-gcm","params":{"iv":"4c2275c4a14a5e984bfaec2b"},"message":"f833f12f6cb57f6961fb34bbf4ff5019c9fd70e1ab98bf0f1ba164f1b4bc773e853f973b708a4ec1b5e1148de96437ac5fc75da87c6b7293628e9d45b4bc2ab7"}}`,
+			passphrase: "1234567890",
+			secret:     secret,
 		},
 	}
 

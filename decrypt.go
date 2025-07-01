@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"golang.org/x/crypto/scrypt"
+	"golang.org/x/crypto/argon2"
 )
 
 // Decrypt decrypts the data provided, returning the secret.
@@ -105,12 +105,9 @@ func obtainDecryptionKey(ks *keystoreV1, normedPassphrase []byte) ([]byte, error
 		}
 		switch ks.KDF.Function {
 		case algoArgon2id:
-			decryptionKey, err = scrypt.Key(normedPassphrase, salt, kdfParams.T, kdfParams.M, kdfParams.P, kdfParams.DKLen)
+			decryptionKey = argon2.IDKey(normedPassphrase, salt, uint32(kdfParams.T), uint32(kdfParams.M), uint8(kdfParams.P), uint32(kdfParams.DKLen))
 		default:
 			return nil, fmt.Errorf("unsupported KDF %q", ks.KDF.Function)
-		}
-		if err != nil {
-			return nil, errors.New("invalid KDF parameters")
 		}
 	}
 

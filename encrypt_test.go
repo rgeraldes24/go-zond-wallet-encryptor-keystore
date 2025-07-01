@@ -19,7 +19,7 @@ func TestEncrypt(t *testing.T) {
 	}{
 		{
 			name:       "Nil",
-			cipher:     "pbkdf2",
+			cipher:     "argon2id",
 			secret:     nil,
 			passphrase: "",
 			err:        errors.New("no secret"),
@@ -27,6 +27,11 @@ func TestEncrypt(t *testing.T) {
 		{
 			name:       "EmptyArgon2id",
 			cipher:     "argon2id",
+			secret:     []byte(""),
+			passphrase: "",
+		},
+		{
+			name:       "EmptyArgon2id2",
 			secret:     []byte(""),
 			passphrase: "",
 		},
