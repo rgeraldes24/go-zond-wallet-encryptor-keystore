@@ -105,7 +105,14 @@ func obtainDecryptionKey(ks *keystoreV1, normedPassphrase []byte) ([]byte, error
 		}
 		switch ks.KDF.Function {
 		case algoArgon2id:
-			decryptionKey = argon2.IDKey(normedPassphrase, salt, uint32(kdfParams.T), uint32(kdfParams.M), uint8(kdfParams.P), uint32(kdfParams.DKLen))
+			decryptionKey = argon2.IDKey(
+				normedPassphrase,
+				salt,
+				uint32(kdfParams.T),
+				uint32(kdfParams.M),
+				uint8(kdfParams.P),
+				uint32(kdfParams.DKLen),
+			)
 		default:
 			return nil, fmt.Errorf("unsupported KDF %q", ks.KDF.Function)
 		}
