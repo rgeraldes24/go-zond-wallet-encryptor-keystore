@@ -15,12 +15,13 @@ func TestInterfaces(t *testing.T) {
 	require.Implements(t, (*zondtypes.Encryptor)(nil), encryptor)
 }
 
-func TestEncryptDecrypt(t *testing.T) {
+func TestRoundTrip(t *testing.T) {
 	tests := []struct {
 		name       string
 		input      string
 		passphrase string
 		secret     []byte
+		options    []keystorev1.Option
 		err        error
 	}{
 		{
@@ -39,8 +40,8 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			encryptor := keystorev1.New()
-			input := make(map[string]interface{})
+			encryptor := keystorev1.New(test.options...)
+			input := make(map[string]any)
 			err := json.Unmarshal([]byte(test.input), &input)
 			require.Nil(t, err)
 			secret, err := encryptor.Decrypt(input, test.passphrase)
@@ -64,9 +65,10 @@ func TestNameAndVersion(t *testing.T) {
 	encryptor := keystorev1.New()
 	assert.Equal(t, "keystore", encryptor.Name())
 	assert.Equal(t, uint(1), encryptor.Version())
+	assert.Equal(t, "keystorev1", encryptor.String())
 }
 
-func TestNew(t *testing.T) {
+func TestGenerateKey(t *testing.T) {
 	encryptor := keystorev1.New()
 	x, err := encryptor.Encrypt([]byte{0xaa, 0xff, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00, 0x12, 0x23, 0x45, 0x67, 0x78, 0xe9, 0x42, 0x61, 0x71, 0x9d, 0x3d, 0x4d, 0x5e, 0xff, 0xfc, 0xcc, 0xae, 0xea, 0x82, 0x21, 0x05, 0x01, 0x74, 0x32}, "")
 	require.Nil(t, err)

@@ -3,92 +3,116 @@ package keystorev1
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 
-	"github.com/theQRL/go-zond-wallet-encryptor-keystore/misc"
-	"golang.org/x/crypto/sha3"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/scrypt"
 )
 
-func passwordToDecryptionKey(password string, salt []byte) ([]byte, error) {
-	h := sha3.NewShake256()
-	if _, err := h.Write([]byte(password)); err != nil {
-		return []byte{}, fmt.Errorf("shake256 hash write failed %v", err)
+// Decrypt decrypts the data provided, returning the secret.
+func (e *Encryptor) Decrypt(input map[string]any, passphrase string) ([]byte, error) {
+	if input == nil {
+		return nil, errors.New("no data supplied")
 	}
-
-	if _, err := h.Write(salt); err != nil {
-		return []byte{}, fmt.Errorf("shake256 hash write failed %v", err)
-	}
-
-	var decryptionKey [32]uint8
-	_, err := h.Read(decryptionKey[:])
-	return decryptionKey[:], err
-}
-
-func (e *Encryptor) Decrypt(data map[string]interface{}, passphrase string) ([]byte, error) {
-	if data == nil {
-		return nil, errors.New("data cannot be nil")
-	}
-
-	b, err := json.Marshal(data)
+	// Marshal the map and unmarshal it back in to a keystore format so we can work with it.
+	data, err := json.Marshal(input)
 	if err != nil {
-		return nil, fmt.Errorf("keystore cannot be parsed | reason %v", err)
+		return nil, errors.New("failed to parse keystore")
 	}
+
 	ks := &keystoreV1{}
-	err = json.Unmarshal(b, &ks)
+	err = json.Unmarshal(data, &ks)
 	if err != nil {
-		return nil, fmt.Errorf("keystore cannot be parsed | reason %v", err)
+		return nil, errors.New("failed to parse keystore")
 	}
 
 	if ks.Cipher == nil {
-		return nil, errors.New("cipher cannot be nil")
+		return nil, errors.New("no cipher")
 	}
 
-	var decryptionKey []byte
-	kdfParams := ks.KDF.Params
-	salt, err := misc.DecodeHex(kdfParams.Salt)
+	normedPassphrase := []byte(normPassphrase(passphrase))
+	res, err := decryptNorm(ks, normedPassphrase)
 	if err != nil {
-		return nil, fmt.Errorf("KDF salt is invalid | reason %v", err)
-	}
-	switch ks.KDF.Function {
-	case "custom":
-		decryptionKey, err = passwordToDecryptionKey(passphrase, salt)
-	default:
-		return nil, fmt.Errorf("invalid KDF %s", ks.KDF.Function)
-	}
-	if err != nil {
-		return nil, errors.New("invalid KDF param")
+		// There is an alternate method to generate a normalised
+		// passphrase that can produce different results.  To allow
+		// decryption of data that may have been encrypted with the
+		// alternate method we attempt to decrypt using that method
+		// given the failure of the standard normalised method.
+		normedPassphrase = []byte(altNormPassphrase(passphrase))
+
+		res, err = decryptNorm(ks, normedPassphrase)
+		if err != nil {
+			// No luck either way.
+			return nil, err
+		}
 	}
 
-	if len(decryptionKey) < 32 {
-		return nil, fmt.Errorf("decryption key size is less than 32 bytes | current size %d", len(decryptionKey))
+	return res, nil
+}
+
+func decryptNorm(ks *keystoreV1, normedPassphrase []byte) ([]byte, error) {
+	decryptionKey, err := obtainDecryptionKey(ks, normedPassphrase)
+	if err != nil {
+		return nil, err
 	}
-	cipherMsg, err := misc.DecodeHex(ks.Cipher.Message)
+
+	cipherMsg, err := hex.DecodeString(ks.Cipher.Message)
 	if err != nil {
 		return nil, errors.New("invalid cipher message")
 	}
 
+	// Decrypt.
+	var res []byte
 	switch ks.Cipher.Function {
-	case "aes-256-gcm":
+	case cipherAes256Gcm:
 		aesCipher, err := aes.NewCipher(decryptionKey)
 		if err != nil {
+			return nil, errors.Wrap(err, "failed to create AES cipher")
+		}
+
+		iv, err := hex.DecodeString(ks.Cipher.Params.IV)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid IV")
+		}
+
+		block, err := cipher.NewGCM(aesCipher)
+		if err != nil {
+			return nil, errors.Wrap(err, "invalid cipher")
+		}
+		res, err = block.Open(nil, iv, cipherMsg, nil)
+		if err != nil {
 			return nil, err
 		}
-		iv, err := misc.DecodeHex(ks.Cipher.Params.IV)
-		if err != nil {
-			return nil, fmt.Errorf("invalid aes IV | reason %v", err.Error())
-		}
-		aesgcm, err := cipher.NewGCM(aesCipher)
-		if err != nil {
-			return nil, err
-		}
-		decipheredMessage, err := aesgcm.Open(nil, iv, cipherMsg, nil)
-		if err != nil {
-			return nil, err
-		}
-		return decipheredMessage, nil
 	default:
-		return nil, fmt.Errorf("unsupported cipher %s", ks.Cipher.Function)
+		return nil, fmt.Errorf("unsupported cipher %q", ks.Cipher.Function)
 	}
+
+	return res, nil
+}
+
+func obtainDecryptionKey(ks *keystoreV1, normedPassphrase []byte) ([]byte, error) {
+	// Decryption key.
+	var decryptionKey []byte
+	if ks.KDF == nil {
+		decryptionKey = normedPassphrase
+	} else {
+		kdfParams := ks.KDF.Params
+		salt, err := hex.DecodeString(kdfParams.Salt)
+		if err != nil {
+			return nil, errors.New("invalid KDF salt")
+		}
+		switch ks.KDF.Function {
+		case algoArgon2id:
+			decryptionKey, err = scrypt.Key(normedPassphrase, salt, kdfParams.T, kdfParams.M, kdfParams.P, kdfParams.DKLen)
+		default:
+			return nil, fmt.Errorf("unsupported KDF %q", ks.KDF.Function)
+		}
+		if err != nil {
+			return nil, errors.New("invalid KDF parameters")
+		}
+	}
+
+	return decryptionKey, nil
 }
