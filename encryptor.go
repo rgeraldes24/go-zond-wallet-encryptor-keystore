@@ -50,7 +50,7 @@ type options struct {
 
 // Option gives options to New.
 type Option interface {
-	apply(*options)
+	apply(opts *options)
 }
 
 type optionFunc func(*options)

@@ -80,7 +80,6 @@ func (e *Encryptor) Encrypt(secret []byte, passphrase string) (map[string]any, e
 
 func (e *Encryptor) generateDecryptionKey(salt []byte, normedPassphrase []byte) ([]byte, error) {
 	var decryptionKey []byte
-	var err error
 
 	switch e.cipher {
 	case algoArgon2id:
@@ -88,17 +87,13 @@ func (e *Encryptor) generateDecryptionKey(salt []byte, normedPassphrase []byte) 
 	default:
 		return nil, fmt.Errorf("unknown cipher %q", e.cipher)
 	}
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to obtain decryption key")
-	}
 
 	return decryptionKey, nil
 }
 
 func (e *Encryptor) buildKDF(salt []byte) *ksKDF {
 	var kdf *ksKDF
-	switch e.cipher {
-	case algoArgon2id:
+	if e.cipher == algoArgon2id {
 		kdf = &ksKDF{
 			Function: algoArgon2id,
 			Params: &ksKDFParams{

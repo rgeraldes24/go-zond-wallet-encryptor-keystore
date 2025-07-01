@@ -83,7 +83,7 @@ func decryptNorm(ks *keystoreV1, normedPassphrase []byte) ([]byte, error) {
 		}
 		res, err = block.Open(nil, iv, cipherMsg, nil)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "failed to decrypt and authenticate ciphertext")
 		}
 	default:
 		return nil, fmt.Errorf("unsupported cipher %q", ks.Cipher.Function)
