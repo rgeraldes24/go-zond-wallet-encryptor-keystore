@@ -18,7 +18,7 @@ const (
 
 	// Argon2id parameters.
 	argon2idT      = 8
-	argon2idM      = 1 << 12
+	argon2idM      = 1 << 18
 	argon2idP      = 1
 	argon2idKeyLen = 32
 
